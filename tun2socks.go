@@ -2,15 +2,17 @@ package tun2socks
 
 import (
 	"context"
+	"log"
 	"runtime"
 	"runtime/debug"
 	"strings"
 	"time"
-	"github.com/Jason-Stan-Lee/go-tun2socks/v2/common/log"
+
 	"github.com/Jason-Stan-Lee/go-tun2socks/v2/core"
 	"github.com/Jason-Stan-Lee/go-tun2socks/v2/proxy/v2ray"
 	vcore "github.com/v2fly/v2ray-core/v5"
 	vproxyman "github.com/v2fly/v2ray-core/v5/app/proxyman"
+	"github.com/v2fly/v2ray-core/v5/common/session"
 )
 
 type PacketFlow interface {
@@ -41,11 +43,15 @@ func StartV2Ray(packetFlow PacketFlow, configBytes []byte) {
 	}
 
 	debug.SetGCPercent(5)
-	ctx := vproxyman.ContextWithSniffingConfig(context.Background(), sniffingConfig)
+
+	content := new(session.Content)
+	content.SniffingRequest.Enabled = sniffingConfig.Enabled
+	content.SniffingRequest.OverrideDestinationForProtocol = sniffingConfig.DestinationOverride
+	ctx := session.ContextWithContent(context.Background(), content)
 
 	// Register tun2socks connection handlers.
-	core.RegisterTCPConnectionHandler(v2ray.NewTCPHandler(ctx, v))
-	core.RegisterUDPConnectionHandler(v2ray.NewUDPHandler(ctx, v, 30*time.Second))
+	core.RegisterTCPConnHandler(v2ray.NewTCPHandler(ctx, v))
+	core.RegisterUDPConnHandler(v2ray.NewUDPHandler(ctx, v, 30*time.Second))
 
 	core.RegisterOutputFn(func(data []byte) (int, error) {
 		// Write IP packets back to TUN.
